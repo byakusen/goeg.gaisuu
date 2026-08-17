@@ -297,6 +297,35 @@
           font-size:calc(var(--rslot) * .66);font-weight:700;line-height:1.3;color:var(--ink);white-space:nowrap}
   @media (max-width:700px){ .scunit{font-size:calc(var(--rslot) * .55);margin-left:3px} }
 
+  /* ---- 10問チャレンジ（challenge10.js の 見た目を このアプリに 合わせる）---- */
+  .headr{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+  #chal-wrap{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .chal-btn{appearance:none;cursor:pointer;font-family:var(--font);font-size:13px;font-weight:700;
+            color:var(--blue);background:#fff;border:2px solid var(--blue);border-radius:999px;
+            padding:5px 13px;box-shadow:0 2px 0 var(--blue);white-space:nowrap}
+  .chal-btn.on{background:var(--blue);color:#fff;box-shadow:0 2px 0 #1B4664}
+  .chal-btn:active{transform:translateY(2px);box-shadow:none}
+  .chal-btn:focus-visible,.chal-btns button:focus-visible{outline:3px solid var(--amber);outline-offset:2px}
+  #chal-bar{display:none;align-items:center;gap:8px;background:#fff;border:2px solid var(--rule);
+            border-radius:999px;padding:4px 12px;font-size:13px;font-weight:700;color:var(--pencil);white-space:nowrap}
+  #chal-dots{color:var(--green);letter-spacing:2px;font-size:14px;line-height:1}
+  #chal-result{display:none;position:fixed;inset:0;background:rgba(30,42,51,.45);z-index:900;
+               align-items:center;justify-content:center}
+  #chal-result.show{display:flex}
+  .chal-card{background:#fff;border:3px solid var(--blue);border-radius:20px;padding:24px 30px;
+             box-shadow:0 10px 40px rgba(30,42,51,.3);text-align:center;max-width:90vw;font-family:var(--font)}
+  .chal-title{font-size:clamp(18px,4vw,26px);font-weight:700;color:var(--blue);margin-bottom:12px}
+  .chal-lines{font-size:clamp(14px,3.2vw,19px);font-weight:700;line-height:2;color:var(--ink)}
+  .chal-lines b{color:var(--red);font-size:1.3em}
+  .chal-msg{margin-top:8px;color:var(--green)}
+  .chal-best{margin-top:6px;font-size:13px;color:var(--pencil)}
+  .chal-btns{display:flex;gap:12px;justify-content:center;margin-top:18px}
+  .chal-btns button{font-family:var(--font);font-weight:700;font-size:clamp(14px,3vw,17px);
+                    border-radius:14px;padding:11px 18px;cursor:pointer;border:3px solid var(--blue)}
+  .chal-btns button:active{transform:translateY(3px);box-shadow:none}
+  #btn-chal-again{background:var(--blue);color:#fff;box-shadow:0 3px 0 #1B4664}
+  #btn-chal-quit{background:#fff;color:var(--blue);box-shadow:0 3px 0 var(--rule)}
+
   .soon{margin-top:40px;text-align:center;color:var(--pencil);font-size:clamp(13px,3.2vw,18px);line-height:2}
   .soon b{color:var(--blue)}
 
@@ -312,7 +341,10 @@
 <div class="app">
   <div class="head">
     <h1>がい数の <span>れんしゅう</span></h1>
-    <div class="score">せいかい <b id="okN">0</b> / <span id="allN">0</span></div>
+    <div class="headr">
+      <div id="chalMount"></div>
+      <div class="score">せいかい <b id="okN">0</b> / <span id="allN">0</span></div>
+    </div>
   </div>
 
   <nav class="tabs" role="tablist">
@@ -348,6 +380,268 @@
     </div>
   </div>
 </div>
+
+<!-- ===== 10問チャレンジ（challenge10.js を そのまま うめこみ）===== -->
+<script>
+/* ============================================================
+   challenge10.js  —  「10問チャレンジ」だけを取り出したもの
+   ------------------------------------------------------------
+   もと：warizan81_kangae.html（小数のかけ算とわり算の筆算）⑪81
+   どんなアプリでも使えるように、CSS と HTML も中に入れてあります。
+   ほかのファイルは いりません（ライブラリなし・ネットもいらない）。
+
+   ■ 使いかた（3つ呼ぶだけ）
+     1. Challenge10.init({ mount: '#どこか', next: () => 次の問題を出す関数() })
+     2. 1問できたら          Challenge10.done()
+     3. まちがえたら          Challenge10.miss()
+
+   ■ そのほか
+     Challenge10.newProblem()  … 新しい問題を出したとき（その問題のミス数を0に）
+     Challenge10.reset()       … 数えなおす（タブを変えたときなど）
+     Challenge10.isOn()        … いまチャレンジ中か
+     Challenge10.stop()        … チャレンジをやめる
+     Challenge10.state         … {on, total, no, miss, missNow, perfect, t0}
+
+   ■ init に わたせるもの（ぜんぶ省略できます）
+     mount       ボタンを置く場所。'#id' か 要素。省略すると <body> の先頭
+     total       何問にするか（初期値 10）
+     next        次の問題を出す関数。これがないと自動で次に進みません
+     nextDelay   はなまるから次の問題までの待ち時間 ms（初期値 1800）
+     resultDelay 最後の問題から成せき表までの待ち時間 ms（初期値 1500）
+     label       ボタンの文字（初期値 '🏁 10問チャレンジ'）
+     sound       ボタンを押したとき鳴らす関数（例: () => playSound('click')）
+     onToggle    on/off が変わったとき呼ばれる関数 (on) => {}
+     onFinish    10問おわったとき呼ばれる関数 (成せき) => {}
+     record      true にすると、その日の最高記録を localStorage に残す
+     recordKey   記録の名前（アプリごとに変える。初期値 'challenge10'）
+     css         false にすると 見た目のCSSを入れない（自分で書くとき）
+   ============================================================ */
+(function (global) {
+    'use strict';
+
+    var CSS = `
+    .chal-btn {
+        font-size: 1rem; font-weight: bold; color: #6a1b9a;
+        background: #f3e5f5; border: 2px solid #ce93d8; border-radius: 20px;
+        padding: 7px 16px; box-shadow: 0 2px 0 #ce93d8; cursor: pointer;
+        font-family: inherit;
+    }
+    .chal-btn.on { color: #fff; background: #8e24aa; border-color: #6a1b9a; box-shadow: 0 2px 0 #4a148c; }
+    .chal-btn:focus-visible, .chal-btns button:focus-visible { outline: 3px solid #8e24aa; outline-offset: 2px; }
+    #chal-bar {
+        display: none; align-items: center; gap: 10px;
+        background: rgba(255,255,255,0.9); border-radius: 20px; padding: 6px 16px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        font-weight: bold; color: #6a1b9a; white-space: nowrap;
+    }
+    #chal-dots { color: #8e24aa; letter-spacing: 2px; font-size: 1.05rem; }
+    #chal-wrap { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    /* おわったときの成せき表 */
+    #chal-result {
+        display: none; position: fixed; left: 0; top: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.45); z-index: 900;
+        align-items: center; justify-content: center;
+    }
+    #chal-result.show { display: flex; }
+    .chal-card {
+        background: #fff; border-radius: 20px; padding: 28px 34px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center; max-width: 90vw;
+    }
+    .chal-title { font-size: 1.8rem; font-weight: bold; color: #8e24aa; margin-bottom: 14px; }
+    .chal-lines { font-size: 1.25rem; font-weight: bold; color: #333; line-height: 2; }
+    .chal-lines b { color: #e53935; font-size: 1.5rem; }
+    .chal-msg { margin-top: 10px; color: #ff6f00; }
+    .chal-best { margin-top: 6px; font-size: 1rem; color: #6a1b9a; }
+    .chal-btns { display: flex; gap: 12px; justify-content: center; margin-top: 20px; }
+    .chal-btns button {
+        padding: 12px 20px; font-size: 1.1rem; font-weight: bold; font-family: inherit;
+        border-radius: 14px; cursor: pointer; border: none;
+    }
+    #btn-chal-again { color: #fff; background: #8e24aa; box-shadow: 0 3px 0 #4a148c; }
+    #btn-chal-quit  { color: #6a1b9a; background: #f3e5f5; border: 2px solid #ce93d8; }
+    @media (prefers-reduced-motion: reduce) { .chal-btn, .chal-btns button { transition: none; } }
+    `;
+
+    var BAR_HTML =
+        '<button id="btn-challenge" class="chal-btn" type="button"></button>' +
+        '<div id="chal-bar"><span id="chal-dots"></span><span id="chal-count"></span></div>';
+
+    var RESULT_HTML =
+        '<div class="chal-card">' +
+        '  <div class="chal-title">🏁 <span id="chal-total-title"></span>問 できました！</div>' +
+        '  <div class="chal-lines" id="chal-lines"></div>' +
+        '  <div class="chal-btns">' +
+        '    <button id="btn-chal-again" type="button">もう一度チャレンジ</button>' +
+        '    <button id="btn-chal-quit" type="button">やめる</button>' +
+        '  </div>' +
+        '</div>';
+
+    var cfg = null;
+    var chal = { on: false, total: 10, no: 0, miss: 0, missNow: 0, perfect: 0, t0: 0 };
+    var $ = function (id) { return document.getElementById(id); };
+
+    // --- きょうの記録（localStorage。使えないときは だまって何もしない）---
+    function todayKey() {
+        var d = new Date();
+        return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    }
+    function loadBest() {
+        if (!cfg.record) return null;
+        try {
+            var raw = localStorage.getItem(cfg.recordKey);
+            if (!raw) return null;
+            var o = JSON.parse(raw);
+            // その日の記録だけ／問題数がちがう記録はまぜない
+            return (o && o.day === todayKey() && o.total === chal.total) ? o : null;
+        } catch (e) { return null; }
+    }
+    function saveBest(perfect, sec) {
+        if (!cfg.record) return null;
+        var best = loadBest();
+        // ノーミスの数が多いほうが上。同じなら 時間が短いほう
+        if (best && (best.perfect > perfect || (best.perfect === perfect && best.sec <= sec))) return best;
+        var o = { day: todayKey(), perfect: perfect, sec: sec, total: chal.total };
+        try { localStorage.setItem(cfg.recordKey, JSON.stringify(o)); } catch (e) { }
+        return o;
+    }
+
+    // --- 帯（○○○●…）の書きかえ ---
+    function chalUpdateBar() {
+        $('btn-challenge').classList.toggle('on', chal.on);
+        $('chal-bar').style.display = chal.on ? 'flex' : 'none';
+        if (!chal.on) return;
+        var dots = '';
+        for (var i = 0; i < chal.total; i++) dots += (i < chal.no) ? '●' : '○';
+        $('chal-dots').innerText = dots;
+        $('chal-count').innerText = Math.min(chal.no + 1, chal.total) + '問め / ' + chal.total;
+    }
+
+    // --- はじめから数えなおす ---
+    function chalReset() {
+        chal.no = 0; chal.miss = 0; chal.missNow = 0; chal.perfect = 0; chal.t0 = Date.now();
+        $('chal-result').classList.remove('show');
+        chalUpdateBar();
+    }
+
+    // --- 1問おわったときに呼ぶ ---
+    function chalDone() {
+        if (!chal.on) return;
+        if (chal.missNow === 0) chal.perfect++;
+        chal.no++;
+        chalUpdateBar();
+        if (chal.no < chal.total) {
+            setTimeout(function () {         // つぎの問題へ
+                if (!chal.on) return;
+                chal.missNow = 0;
+                if (cfg.next) cfg.next();
+            }, cfg.nextDelay);
+            return;
+        }
+        var sec = Math.floor((Date.now() - chal.t0) / 1000);
+        var msg = (chal.perfect === chal.total) ? 'ぜんぶノーミス！ すばらしい！'
+                : (chal.perfect >= chal.total - 2) ? 'よくがんばりました！'
+                : 'つぎは もっとできる！';
+        var best = saveBest(chal.perfect, sec);
+        var result = { perfect: chal.perfect, miss: chal.miss, sec: sec, total: chal.total };
+        setTimeout(function () {
+            $('chal-total-title').innerText = chal.total;
+            $('chal-lines').innerHTML =
+                '<div>ノーミスでできた問題　<b>' + chal.perfect + '</b> / ' + chal.total + '</div>' +
+                '<div>まちがえた回数　<b>' + chal.miss + '</b> 回</div>' +
+                '<div>かかった時間　<b>' + Math.floor(sec / 60) + '</b> 分 <b>' + (sec % 60) + '</b> 秒</div>' +
+                '<div class="chal-msg">' + msg + '</div>' +
+                (best ? '<div class="chal-best">きょうの最高記録　ノーミス ' + best.perfect + ' / ' + best.total +
+                        ' 問　　' + Math.floor(best.sec / 60) + '分' + (best.sec % 60) + '秒</div>' : '');
+            $('chal-result').classList.add('show');
+            $('btn-chal-again').focus();
+            if (cfg.onFinish) cfg.onFinish(result);
+        }, cfg.resultDelay);
+    }
+
+    // --- はじめの用意 ---
+    function init(opt) {
+        opt = opt || {};
+        cfg = {
+            total: opt.total || 10,
+            next: opt.next || null,
+            nextDelay: (opt.nextDelay === undefined) ? 1800 : opt.nextDelay,
+            resultDelay: (opt.resultDelay === undefined) ? 1500 : opt.resultDelay,
+            label: opt.label || '🏁 10問チャレンジ',
+            sound: opt.sound || null,
+            onToggle: opt.onToggle || null,
+            onFinish: opt.onFinish || null,
+            record: !!opt.record,
+            recordKey: opt.recordKey || 'challenge10',
+            css: (opt.css === undefined) ? true : opt.css
+        };
+        chal.total = cfg.total;
+        if (opt.label === undefined && cfg.total !== 10) cfg.label = '🏁 ' + cfg.total + '問チャレンジ';
+
+        // CSS
+        if (cfg.css && !$('chal-style')) {
+            var st = document.createElement('style');
+            st.id = 'chal-style';
+            st.textContent = CSS;
+            document.head.appendChild(st);
+        }
+        // ボタンと帯
+        var host = (typeof opt.mount === 'string') ? document.querySelector(opt.mount) : opt.mount;
+        var wrap = $('chal-wrap');
+        if (!wrap) {
+            wrap = document.createElement('div');
+            wrap.id = 'chal-wrap';
+            wrap.innerHTML = BAR_HTML;
+            if (host) host.appendChild(wrap);
+            else document.body.insertBefore(wrap, document.body.firstChild);
+        }
+        // 成せき表
+        if (!$('chal-result')) {
+            var res = document.createElement('div');
+            res.id = 'chal-result';
+            res.innerHTML = RESULT_HTML;
+            document.body.appendChild(res);
+        }
+        $('btn-challenge').innerText = cfg.label;
+
+        $('btn-challenge').addEventListener('click', function () {
+            chal.on = !chal.on;
+            if (cfg.sound) cfg.sound();
+            chalReset();
+            if (cfg.onToggle) cfg.onToggle(chal.on);
+            if (cfg.next) cfg.next();
+        });
+        $('btn-chal-again').addEventListener('click', function () {
+            chalReset();
+            if (cfg.next) cfg.next();
+        });
+        $('btn-chal-quit').addEventListener('click', function () {
+            chal.on = false;
+            chalReset();
+            if (cfg.onToggle) cfg.onToggle(false);
+            if (cfg.next) cfg.next();
+        });
+
+        chalUpdateBar();
+        return API;
+    }
+
+    var API = {
+        init: init,
+        done: chalDone,                                        // 1問できた
+        miss: function () { if (chal.on) { chal.miss++; chal.missNow++; } },  // まちがえた
+        newProblem: function () { chal.missNow = 0; },          // 新しい問題を出した
+        reset: chalReset,                                       // 数えなおす
+        stop: function () { chal.on = false; chalReset(); },    // やめる
+        isOn: function () { return chal.on; },
+        updateBar: chalUpdateBar,
+        setTotal: function (n) { chal.total = cfg.total = n; chalReset(); },
+        state: chal
+    };
+
+    global.Challenge10 = API;
+    if (typeof module !== 'undefined' && module.exports) module.exports = API;
+})(typeof window !== 'undefined' ? window : this);
+</script>
 
 <script>
 (function(){
@@ -557,7 +851,7 @@
 
   function judgeCards(){
     if(step!==3) return;
-    if(sel.length===0){ say('カードを タップして えらんでね。','bad'); return; }
+    if(sel.length===0){ say('カードを タップして えらんでね。','tip'); return; }   // まだ 何も えらんでいない だけなので ミスに しない
     if(!counted){ counted=true; allN++; }
     const wrong = sel.filter(i=> !(P.cards[i]>=P.low && P.cards[i]<P.hi));
     if(wrong.length){
@@ -1114,11 +1408,19 @@
       sound.currentTime = 0; sound.play().catch(()=>{});
     }catch(e){}
 
+    // 10問チャレンジ：ここが「1問できた」ところ（全タブ 共通で ここを 通る）
+    if(window.Challenge10 && Challenge10.isOn()) Challenge10.done();
+
     // 2びょう見せて、フェードアウト
     clearTimeout(autoTimer);
     autoTimer = setTimeout(()=>{
       img.classList.add('fade');
-      autoTimer = setTimeout(()=>{ advance ? newQ() : img.remove(); }, 450);
+      autoTimer = setTimeout(()=>{
+        // チャレンジの 最後の1問は、成せき表を 出すので つぎに すすめない
+        const st = window.Challenge10 ? Challenge10.state : null;
+        if(st && st.on && st.no >= st.total){ img.remove(); return; }
+        advance ? newQ() : img.remove();
+      }, 450);
     }, 2000);
   }
 
@@ -1259,7 +1561,7 @@
       [['place','◯の位までの'],['top','上から◯けたの']].forEach(([k,label])=>{
         const b=document.createElement('button');
         b.className='fmt'+(gsub===k?' on':''); b.textContent=label;
-        b.onclick=()=>{ if(gsub!==k){ gsub=k; fitMin=1; newQ(); } };
+        b.onclick=()=>{ if(gsub!==k){ gsub=k; fitMin=1; if(window.Challenge10) Challenge10.reset(); newQ(); } };
         w.appendChild(b);
       });
       return;
@@ -1271,7 +1573,7 @@
       [['line','数直線'],['card','カード'],['scratch','最初から考える']].forEach(([k,label])=>{
         const b=document.createElement('button');
         b.className='sub'+(rsub===k?' on':''); b.textContent=label;
-        b.onclick=()=>{ if(rsub!==k){ rsub=k; fitMin=1; newQ(); } };
+        b.onclick=()=>{ if(rsub!==k){ rsub=k; fitMin=1; if(window.Challenge10) Challenge10.reset(); newQ(); } };
         r1.appendChild(b);
       });
       w.appendChild(r1);
@@ -1386,9 +1688,14 @@
   window.addEventListener('resize', refit);
   window.addEventListener('orientationchange', ()=>setTimeout(refit,250));
 
-  function say(t,cls){ const m=$('msg'); m.textContent=t; m.className='msg '+(cls||''); fitScreen(); }
+  // 赤いメッセージ（'bad'）＝ まちがえた とき。10問チャレンジの ミスは ここで 数える
+  function say(t,cls){
+    if(cls==='bad' && window.Challenge10) Challenge10.miss();
+    const m=$('msg'); m.textContent=t; m.className='msg '+(cls||''); fitScreen();
+  }
 
   function newQ(){
+    if(window.Challenge10) Challenge10.newProblem();   // この問題の ミス数を 0に もどす
     clearTimeout(autoTimer); autoTimer=null;
     document.querySelectorAll('.hanamaru').forEach(e=>e.remove());
     op=null; input=''; counted=false; locked=false; noShown=false; rin=['','']; rbox=0; sel=[];
@@ -1451,7 +1758,9 @@
   document.querySelectorAll('.tab').forEach(t=>{
     t.onclick=()=>{
       document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected','false'));
-      t.setAttribute('aria-selected','true'); mode=t.dataset.mode; fitMin=1; newQ();
+      t.setAttribute('aria-selected','true'); mode=t.dataset.mode; fitMin=1;
+      if(window.Challenge10) Challenge10.reset();   // タブを かえたら 数えなおし
+      newQ();
     };
   });
   $('ruleBtn').onclick=()=>{ $('ruleBox').classList.toggle('show'); fitScreen(); };
@@ -1463,6 +1772,23 @@
       else if(e.key==='Backspace'){ e.preventDefault(); back(); }
     }else if(step===4 && e.key==='Enter') newQ();
   });
+
+  /* ---------- 10問チャレンジ ---------- */
+  // next は わたさない（＝モジュールに 自動で つぎへ すすめさせない）。
+  // 「四捨五入」などの 自動で すすむ タブは これまでどおり showHanamaru が、
+  // 解説を 読ませる タブは これまでどおり「次の問題 →」が すすめる。
+  if(window.Challenge10){
+    Challenge10.init({
+      mount:'#chalMount',
+      total:10,
+      css:false,                 // 見た目は このファイルの CSS を使う
+      next:null,
+      record:false,              // true にすると「きょうの最高記録」を のこす（共用パソコンでは false のまま）
+      recordKey:'gaisu4',
+      onToggle:()=>{ fitMin=1; newQ(); }        // 「はじめる」「やめる」→ 新しい問題から
+    });
+    $('btn-chal-again').addEventListener('click', ()=>{ fitMin=1; newQ(); });   // 「もう一度チャレンジ」
+  }
 
   newQ();
 })();
