@@ -247,6 +247,38 @@
        color:var(--blue);background:#fff;border:2px solid var(--blue);border-radius:10px;padding:6px 14px}
   .sub.on{background:var(--blue);color:#fff}
   .sub:disabled{opacity:.5;cursor:default}
+  /* 「がい数」タブの ランダム（色を かえる）*/
+  /* 「がい数」「がい数のはんい」タブ：問題文・小タブ・その下の だんの あいだを 広く */
+  .steps.wide{margin-top:clamp(20px,4.4vh,38px);margin-bottom:clamp(12px,2.4vh,20px);gap:clamp(20px,4vh,34px)}
+
+  /* ===== 「がい数」タブ：横長の 画面では テンキーを 横に ならべて 大きく（横はばは ほかのタブと 同じ）===== */
+  @media (min-width:900px) and (min-aspect-ratio:6/5){
+    body.m-gaisu{--cell:clamp(40px, min(6.4vw, 9.6vh), 62px)}
+    body.m-gaisu .q{font-size:clamp(18px,3.6vh,32px)}
+    body.m-gaisu .sub{font-size:clamp(14px,2.5vh,21px);padding:.45em 1.1em}
+    body.m-gaisu .stp{font-size:clamp(13px,2.1vh,18px);padding:.4em .8em}
+    body.m-gaisu .lbl{font-size:clamp(12px,2vh,17px);height:1.6em;line-height:1.6em}
+    body.m-gaisu .play{gap:clamp(10px,1.6vw,22px)}
+    body.m-gaisu .board{min-height:calc(var(--cellh) * 3.02 + 84px)}   /* こたえの 行が 出ても 画面が ちぢまないように 先に とっておく */
+    /* そうさパネル：左に 切り上げ・切り捨て・次の問題、右に テンキー */
+    body.m-gaisu .panel{width:clamp(330px,44%,390px);display:grid;grid-template-columns:.9fr 1.7fr;
+         grid-template-rows:auto 1fr 1fr 1fr;column-gap:clamp(10px,1.4vw,20px);row-gap:clamp(8px,1.4vh,14px);
+         align-items:stretch;padding-left:clamp(14px,2vw,28px)}
+    body.m-gaisu .panel .cap{grid-column:1/-1;min-height:0;font-size:clamp(13px,2.1vh,18px)}
+    body.m-gaisu .panel .big{font-size:clamp(15px,2.6vh,20px);padding-left:4px;padding-right:4px;white-space:nowrap;grid-column:1}
+    body.m-gaisu .panel .big.up{grid-row:2}
+    body.m-gaisu .panel .big.down{grid-row:3}
+    body.m-gaisu .panel .nextbtn{grid-row:4;margin-top:0}
+    body.m-gaisu .panel .pad{grid-column:2;grid-row:2/5;gap:clamp(6px,1.1vh,12px)}
+    body.m-gaisu .key{font-size:clamp(22px,4.4vh,34px);padding:clamp(4px,1vh,12px) 0}
+    body.m-gaisu .key.sub{font-size:clamp(10px,1.7vh,13px);letter-spacing:-.04em;white-space:nowrap}
+    body.m-gaisu .msg{font-size:clamp(15px,2.8vh,24px)}
+    body.m-gaisu .rule button{font-size:clamp(13px,1.9vh,16px)}
+  }
+  .sub.whr{color:#16774E;background:#EEF8F2;border-color:var(--green)}
+  .sub.whr.on{background:var(--green);color:#fff;border-color:#13603F}
+  .sub.rand{color:#B4501A;background:#FFF3EA;border-color:#E07A2E}
+  .sub.rand.on{background:#D9661F;color:#fff;border-color:#B4501A}
 
   /* ---- 補足のふきだし ---- */
   .note{margin-top:clamp(6px,1.6vh,14px);max-width:620px;background:#FFF6F5;border:2px dashed var(--red);border-radius:12px;
@@ -349,9 +381,7 @@
 
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" data-mode="about" aria-selected="true">約何万</button>
-    <button class="tab" role="tab" data-mode="round" aria-selected="false">四捨五入</button>
-    <button class="tab" role="tab" data-mode="man" aria-selected="false">◯の位までの</button>
-    <button class="tab" role="tab" data-mode="top2" aria-selected="false">上から◯けたの</button>
+    <button class="tab" role="tab" data-mode="gaisu" aria-selected="false">がい数</button>
     <button class="tab" role="tab" data-mode="range" aria-selected="false">がい数のはんい</button>
     <button class="tab" role="tab" data-mode="gai" aria-selected="false">がい算</button>
     <button class="tab" role="tab" data-mode="apply" aria-selected="false">応用問題</button>
@@ -659,6 +689,26 @@
   let sel=[];                             // カードで えらんだ ばんごう
   let pick=[null,null];
   let gsub='place';                       // がい算：'place'=◯の位まで（＋−） / 'top'=上から◯けた（×÷）
+  // がい数：'round'=四捨五入 / 'man'=◯の位までの / 'top2'=上から◯けたの / 'rand'=ランダム / 'where'=四捨五入はどの位の数？
+  const GAISU = ['round','man','top2'];
+  let asub='round';                       // えらんでいる 小タブ
+  let tsub=null;                          // テストの練習中だけ つかう 小タブ
+  const testing = ()=> !!(window.TestRun && TestRun.on());
+  const effSub  = ()=> (testing() && tsub) ? tsub : asub;
+  // ランダム：3しゅるいを 1つずつ 入れた ふくろから 引く（3問ごとに かならず 1回ずつ＝均等）
+  let bag=[], lastRand=null;
+  function nextRand(){
+    if(!bag.length){
+      bag = GAISU.slice();
+      for(let i=bag.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [bag[i],bag[j]]=[bag[j],bag[i]]; }
+      if(bag[bag.length-1]===lastRand) [bag[0],bag[bag.length-1]]=[bag[bag.length-1],bag[0]]; // つなぎめで 同じに ならない
+    }
+    lastRand = bag.pop();
+    return lastRand;
+  }
+  // 「四捨五入はどの位の数？」も 同じ しくみ（3しゅるいが 均等に 出る）
+  const isWhere = ()=> GAISU.includes(mode) && effSub()==='where';
+  const isMix   = ()=> effSub()==='rand' || effSub()==='where';
   const LAB = {miman:['以上','未満'], ika:['以上','以下'], sb:['いちばん小さい数','いちばん大きい数']};
 
   const rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
@@ -1337,6 +1387,7 @@
         // 正円（半径31・中心 30,37.5）／下から 時計まわり に かく
         p.setAttribute('d','M30 68.5 C12.9 68.5, -1 54.6, -1 37.5 C-1 20.4, 12.9 6.5, 30 6.5 C47.1 6.5, 61 20.4, 61 37.5 C61 54.6, 48 68.3, 32.2 67.9');
         p.setAttribute('class','pen draw'); p.style.setProperty('--len','212');
+        if(isWhere() && mode!=='round' && !reduce) p.style.animationDelay='.5s';   // 「の」が 出てから 赤○
         svg.appendChild(p);
       }
       // 四捨五入する位から下だけに斜線（くり上げる左どなりの数字は消さない）
@@ -1353,7 +1404,7 @@
     // 「の」の行（「一万の位までの」「上から２けたの」だけ）
     for(let i=0;i<P.L;i++){
       const e=document.createElement('div'); e.className='norow';
-      if(mode!=='round' && step>=1 && i===P.target-1){
+      if(mode!=='round' && (isWhere() ? step>=2 : step>=1) && i===P.target-1){
         const s=document.createElement('span'); s.textContent='の';
         if(noShown) s.style.animation='none';   // ２回目からは動かさない
         noShown = true;
@@ -1444,6 +1495,7 @@
 
   function tapDigit(i,el){
     if(step!==1) return;
+    if(isWhere()){ tapWhere(i,el); return; }
     if(i===P.target){ step=2; buildBoard(); panel(); say('この数字を四捨五入するよ。切り上げ？ 切り捨て？','tip'); }
     else{
       el.classList.add('shake'); setTimeout(()=>el.classList.remove('shake'),400);
@@ -1452,6 +1504,37 @@
       else hint='四捨五入するのは、「の」を書いた 数字の すぐ 右どなり だよ。';
       say(hint,'bad');
     }
+  }
+
+  // 「四捨五入はどの位の数？」：四捨五入する 位の 数字を タップするだけ
+  function tapWhere(i,el){
+    if(!counted){ counted=true; allN++; }
+    if(i===P.target){
+      okN++; step=2; buildBoard(); panel();
+      const place = placeOf(P.L,P.target)+'の位';
+      say(mode==='round' ? `正解！ ${place}の 数字を 四捨五入するよ。`
+        : `正解！ 「の」の すぐ 右どなり、${place}の 数字を 四捨五入するよ。`,'good');
+      const cell = document.querySelectorAll('#grid .dg')[P.target];
+      clearTimeout(autoTimer);
+      autoTimer = setTimeout(()=>{ showHanamaru(cell, true); placeWhereHanamaru(); }, reduce ? 0 : (mode==='round' ? 500 : 1000));
+    }else{
+      el.classList.add('shake'); setTimeout(()=>el.classList.remove('shake'),400);
+      say(mode==='round' ? `そこは ${placeOf(P.L,i)}の位 だよ。問題の 文を よく 読もう。`
+        : mode==='man' ? `${P.keepName}までの がい数だよ。${P.keepName}の ひとつ下の 位を 四捨五入するよ。`
+        : `上から${P.keepN}けたの がい数だよ。上から${P.keepN+1}けための 数字を 四捨五入するよ。`, 'bad');
+    }    $('okN').textContent=okN; $('allN').textContent=allN;
+  }
+
+  // はなまるは 数字に かぶらないように、数字の 下（「の」の 行の 下）の まん中に 出す
+  function placeWhereHanamaru(){
+    const wrap=document.querySelector('.gridwrap'), img=wrap && wrap.querySelector('.hanamaru');
+    const dgs=document.querySelectorAll('#grid .dg'), nos=document.querySelectorAll('#grid .norow');
+    if(!img || !dgs.length) return;
+    const wr=wrap.getBoundingClientRect(), a=dgs[0].getBoundingClientRect(), z=dgs[dgs.length-1].getBoundingClientRect();
+    const below=(nos.length ? nos[0].getBoundingClientRect().bottom : z.bottom);
+    const iw=img.offsetWidth || 90;   // うごきの とちゅうの 大きさでは なく、もとの はば
+    img.style.left = ((a.left + z.right)/2 - wr.left)/fitK - iw/2 + 'px';
+    img.style.top  = (below - wr.top)/fitK - iw*0.14 + 'px';   // 少しだけ 上に（数字には かからない）
   }
 
   function chooseOp(o){
@@ -1559,7 +1642,7 @@
 
   /* ---------- 右パネル ---------- */
   function stepChips(){
-    const w=$('steps'); w.innerHTML=''; w.classList.remove('col');
+    const w=$('steps'); w.innerHTML=''; w.classList.remove('col','wide');
     if(mode==='about'||mode==='apply') return;
     if(mode==='gai'){
       [['place','◯の位までの'],['top','上から◯けたの']].forEach(([k,label])=>{
@@ -1571,7 +1654,7 @@
       return;
     }
     if(mode==='range'){
-      w.classList.add('col');
+      w.classList.add('col','wide');
       // 1だんめ：小タブ
       const r1=document.createElement('div'); r1.className='chiprow';
       [['line','数直線'],['card','カード'],['scratch','最初から考える']].forEach(([k,label])=>{
@@ -1596,14 +1679,33 @@
       }
       return;
     }
-    const list = (mode==='round')
+    // がい数：1だんめ＝小タブ（四捨五入／◯の位までの／上から◯けたの／ランダム）
+    w.classList.add('col','wide');
+    const g1=document.createElement('div'); g1.className='chiprow';
+    [['round','四捨五入'],['man','◯の位までの'],['top2','上から◯けたの'],['rand','ランダム'],['where','四捨五入はどの位の数？']].forEach(([k,label])=>{
+      const b=document.createElement('button');
+      b.className='sub'+(k==='rand'?' rand':'')+(k==='where'?' whr':'')+(effSub()===k?' on':''); b.textContent=label;
+      b.onclick=()=>{
+        const changed = (asub!==k);
+        if(changed){ asub=k; bag=[]; if(GAISU.includes(k)) mode=k;
+          if(window.Challenge10) Challenge10.reset(); }
+        fitMin=1; newQ();                    // おしたら いつでも 新しい 問題
+      };
+      g1.appendChild(b);
+    });
+    w.appendChild(g1);
+    // 2だんめ：手じゅん
+    const g2=document.createElement('div'); g2.className='chiprow'; w.appendChild(g2);
+    const list = isWhere()
+      ? [[1,'① 四捨五入する 位の 数字を タップ']]
+      : (mode==='round')
       ? [[1,'① 四捨五入する数字をタップ'],[2,'② 切り上げ・切り捨て'],[3,'③ こたえを入力']]
       : [[0, mode==='man' ? `① ${P.keepName}の数字をタップ` : `① 上から${P.keepN}けための数字をタップ`],
          [1,'② 四捨五入する数字をタップ'],[2,'③ 切り上げ・切り捨て'],[3,'④ こたえを入力']];
     list.forEach(([s,label])=>{
       const d=document.createElement('div');
       d.className='stp'+(step===s?' on':(step>s?' done':''));
-      d.textContent=label; w.appendChild(d);
+      d.textContent=label; g2.appendChild(d);
     });
   }
 
@@ -1614,6 +1716,9 @@
     // せつめい
     const cap=document.createElement('div'); cap.className='cap';
     if(step===0) cap.textContent = `まず、${boundaryLabel()}を タップしてね。下に「の」が入るよ。`;
+    else if(isWhere()) cap.textContent = (step===1)
+      ? '四捨五入する 位の 数字を タップしてね。'
+      : 'よくできました！';
     else if(step===1) cap.textContent = (mode==='round')
       ? 'まず、四捨五入する けた の数字を タップしてね。'
       : 'つぎに、「の」の 右どなり の数字を タップ。そこを四捨五入するよ。';
@@ -1639,7 +1744,7 @@
       const b1=document.createElement('button'); b1.className='big up'; b1.textContent='切り上げ';
       const b2=document.createElement('button'); b2.className='big down'; b2.textContent='切り捨て';
       b1.onclick=()=>chooseOp('up'); b2.onclick=()=>chooseOp('down');
-      b1.disabled=b2.disabled=(step!==2);
+      b1.disabled=b2.disabled=(step!==2 || isWhere());
       c.append(b1,b2);
     }
 
@@ -1704,6 +1809,8 @@
 
   function newQ(){
     if(window.Challenge10) Challenge10.newProblem();   // この問題の ミス数を 0に もどす
+    if(GAISU.includes(mode) && isMix()) mode = nextRand();   // ランダム／四捨五入はどの位の数？
+    document.body.classList.toggle('m-gaisu', GAISU.includes(mode));   // がい数タブだけ 横に広げる
     window.mode = curKey();                            // テストの練習に いまの 小タブを つたえる
     window.hintOn = false;
     clearTimeout(autoTimer); autoTimer=null;
@@ -1757,10 +1864,11 @@
       $('ruleBox').classList.remove('show');
       return;
     }
-    P=makeProblem(); step=(mode==='round')?1:0;
-    $('q').innerHTML=questionText();
+    P=makeProblem(); step=(mode==='round' || isWhere())?1:0;
+    $('q').innerHTML=questionText() + (isWhere() ? '<small>四捨五入するのは どの位の 数字かな？ タップしよう。</small>' : '');
     buildBoard(); panel();
-    say(mode==='round' ? '四捨五入する けた の数字を タップしよう。'
+    say(isWhere() ? '四捨五入する 位の 数字を タップしよう。'
+      : mode==='round' ? '四捨五入する けた の数字を タップしよう。'
                        : `${boundaryLabel()}は どれかな？ タップしよう。`,'tip');
     $('ruleBox').classList.remove('show');
   }
@@ -1768,7 +1876,8 @@
   document.querySelectorAll('.tab').forEach(t=>{
     t.onclick=()=>{
       document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected','false'));
-      t.setAttribute('aria-selected','true'); mode=t.dataset.mode; fitMin=1;
+      t.setAttribute('aria-selected','true'); fitMin=1;
+      mode = (t.dataset.mode==='gaisu') ? (GAISU.includes(asub) ? asub : 'round') : t.dataset.mode;
       if(window.Challenge10) Challenge10.reset();   // タブを かえたら 数えなおし
       newQ();
     };
@@ -1800,6 +1909,8 @@
   const TKEY = {
     about  :{m:'about'},              round  :{m:'round'},
     man    :{m:'man'},                top2   :{m:'top2'},
+    grand  :{m:'round', a:'rand'},
+    gwhere :{m:'round', a:'where'},
     line   :{m:'range', rsub:'line'}, card   :{m:'range', rsub:'card'},
     scratch:{m:'range', rsub:'scratch'},
     gplace :{m:'gai',   gsub:'place'}, gtop  :{m:'gai',   gsub:'top'},
@@ -1810,6 +1921,8 @@
     round  :{label:'四捨五入'},
     man    :{label:'◯の位までの がい数'},
     top2   :{label:'上から◯けたの がい数'},
+    grand  :{label:'がい数', sub:'（ランダム）'},
+    gwhere :{label:'四捨五入は どの位の数？'},
     line   :{label:'がい数のはんい', sub:'（数直線）', meth:'miman'},
     card   :{label:'がい数のはんい', sub:'（カード）'},
     scratch:{label:'がい数のはんい', sub:'（最初から考える）'},
@@ -1817,7 +1930,9 @@
     gtop   :{label:'がい算', sub:'（上から◯けたの）'},
     apply  :{label:'応用問題'}
   };
-  const curKey = ()=> mode==='range' ? rsub
+  const curKey = ()=> (GAISU.includes(mode) && effSub()==='rand') ? 'grand'
+                    : (GAISU.includes(mode) && effSub()==='where') ? 'gwhere'
+                    : mode==='range' ? rsub
                     : mode==='gai'   ? (gsub==='place' ? 'gplace' : 'gtop')
                     : mode;
   // 答え方（fmt）は 小タブの 名前に 入っていないので、
@@ -1830,11 +1945,16 @@
     if(t.gsub) gsub = t.gsub;
     const e = window.MODES[key];
     const testing = !!(window.TestRun && TestRun.on());
+    if(GAISU.includes(t.m)){                 // がい数の 小タブ
+      const v = t.a || t.m;
+      if(testing) tsub = v; else { asub = v; tsub = null; }
+      if(v==='rand' || v==='where') bag=[];
+    }else if(!testing) tsub = null;
     if(testing && fmtSaved === null) fmtSaved = fmt;
     if(testing && e && e.meth && key==='line') fmt = e.meth;   // 答え方（以上・未満 など）
     if(!testing && fmtSaved !== null){ fmt = fmtSaved; fmtSaved = null; }
     document.querySelectorAll('.tab').forEach(x=>
-      x.setAttribute('aria-selected', x.dataset.mode===mode ? 'true' : 'false'));
+      x.setAttribute('aria-selected', x.dataset.mode===(GAISU.includes(mode) ? 'gaisu' : mode) ? 'true' : 'false'));
     fitMin = 1;
     if(window.Challenge10) Challenge10.reset();
     newQ();
@@ -1869,7 +1989,7 @@
 <!-- ============================================================
      📝 テストの 練習 ①せってい（このアプリの ぶん。ここだけ 直す）
      mode の 名前は 本体の window.MODES（アダプター）の キー。
-       about / round / man / top2 /
+       about / round / man / top2 / grand（がい数のランダム）/ gwhere（四捨五入はどの位の数？）/
        line・card・scratch（がい数のはんい）/ gplace・gtop（がい算）/ apply
      meth は「数直線」の 答え方 … miman（以上・未満）/ ika（以上・以下）/ sb（小さい数・大きい数）
      ============================================================ -->
