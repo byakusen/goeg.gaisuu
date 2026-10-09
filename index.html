@@ -170,6 +170,23 @@
            column-gap:clamp(2px,1vw,10px);row-gap:4px;margin-top:clamp(4px,1.4vh,10px)}
   .gnum{font-size:calc(var(--rslot) * 1.02);font-weight:600;line-height:1;white-space:nowrap;text-align:center}
   .gop{font-size:calc(var(--rslot) * 1.02);font-weight:700;line-height:1;text-align:center}
+  /* がい算の ヒント */
+  .gnum .gd{position:relative;display:inline-block;margin:0 .14em}
+  .gnum .gd.no::after{content:'の';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+       font-size:.62em;font-weight:700;color:var(--ink,#1E2A33);margin-top:.12em}
+  .gnum .gd.circ::before{content:'';position:absolute;left:50%;top:50%;width:1.18em;height:1.18em;
+       transform:translate(-50%,-50%);border:3px solid #E0322B;border-radius:50%;pointer-events:none}
+  .abox.frame{position:relative}
+  .gzero{position:absolute;top:100%;display:flex;flex-direction:column;align-items:center;pointer-events:none;
+       margin-top:4px;color:#C2410C;font-weight:700;font-size:calc(var(--rslot) * .68);line-height:1.1;white-space:nowrap}
+  .gzero svg{width:100%;height:calc(var(--rslot) * .38);overflow:visible}
+  .gaigrid.zh{margin-bottom:calc(var(--rslot) * 1.5)}
+  .rslot.strike{background:linear-gradient(to top right,transparent calc(50% - 1.6px),#1E2A33 calc(50% - 1.6px),
+       #1E2A33 calc(50% + 1.6px),transparent calc(50% + 1.6px)) !important}
+  .ghint{appearance:none;cursor:pointer;font-family:var(--font);font-weight:700;font-size:clamp(12px,1.9vh,16px);
+       width:100%;margin:0 0 clamp(6px,1.2vh,10px);padding:.4em .8em;border-radius:12px;border:2px solid var(--amber);
+       background:#FFFBEC;color:#8A5A00}
+  .ghint.on{background:var(--amber);color:#3A2B00}
   .gdown{display:flex;justify-content:center;padding:2px 0}
   .gdown svg{width:22px;height:34px;overflow:visible}
   .abox.frame{border:3px solid var(--blue);border-radius:10px;padding:3px 5px;background:#fff}
@@ -685,6 +702,8 @@
   let mode='about', P=null, step=1, op=null, input='', okN=0, allN=0, counted=false, locked=false;
   let ansCells = [], autoTimer = null, noShown = false;
   let fmt='miman', rin=['',''], rbox=0;   // がい数のはんい／がい算 用
+  let gHint=false;                        // がい算の ヒントを 出しているか
+  let gDone=false;                        // がい数の 式が できあがったか（ヒントを もとに もどすため）
   let rsub='line';                        // がい数のはんい：'line'=数直線 / 'card'=カード / 'scratch'=最初から考える
   let sel=[];                             // カードで えらんだ ばんごう
   let pick=[null,null];
@@ -838,6 +857,7 @@
       s.className='rslot'+(v?' filled':'')+(step===4?' ok':'')
         +(step===3 && b===rbox && i===rin[b].length ? ' next':'');
     });
+    if(mode==='gai') paintGaiHint();
   }
 
   /* ---------- がい数のはんい：カード ---------- */
@@ -1247,10 +1267,16 @@
   }
 
   /* ---------- がい算 ---------- */
+  // ＋と－、×と÷は 交互に 出す（さいしょは ランダム）
+  const lastOp = {place:null, top:null};
+  function nextOp(k, a, b){
+    lastOp[k] = (lastOp[k]===a) ? b : (lastOp[k]===b) ? a : (Math.random()<0.5 ? a : b);
+    return lastOp[k];
+  }
   function makeGai(){
     if(gsub==='place'){
       const keep = Math.random()<0.5 ? 100 : 1000;
-      const op = Math.random()<0.5 ? '＋' : '－';
+      const op = nextOp('place','＋','－');
       const R = v => Math.floor(v/keep + 0.5)*keep;
       for(let t=0;t<300;t++){
         let a = (keep===100) ? rnd(120,980) : rnd(1200,9800);
@@ -1267,7 +1293,7 @@
       }
     }
     // 上から１けた（×・÷）
-    const op = Math.random()<0.5 ? '×' : '÷';
+    const op = nextOp('top','×','÷');
     const R1 = v => { const k=String(v).length-1, u=Math.pow(10,k); return Math.floor(v/u + 0.5)*u; };
     for(let t=0;t<300;t++){
       if(op==='×'){
@@ -1288,6 +1314,7 @@
                 rlen:[String(ra).length,String(rb).length,String(ans).length]};
       }
     }
+    lastOp.top = (op==='×') ? '÷' : '×';   // つくりなおすときも 同じ しゅるいに なるように
     return makeGai();
   }
 
@@ -1307,7 +1334,10 @@
 
     const gr=document.createElement('div'); gr.className='gaigrid';
     // 1だんめ：もとの式
-    gr.append(cell(P.a,'gnum'), cell(P.op,'gop'), cell(P.b,'gnum'), cell('',''), cell('',''));
+    const num=(v,w)=>{ const d=document.createElement('div'); d.className='gnum'; d.dataset.w=w;
+      String(v).split('').forEach(ch=>{ const sp=document.createElement('span'); sp.className='gd'; sp.textContent=ch; d.appendChild(sp); });
+      return d; };
+    gr.append(num(P.a,0), cell(P.op,'gop'), num(P.b,1), cell('',''), cell('',''));
     // 2だんめ：やじるし
     gr.append(down(), cell('',''), down(), cell('',''), cell('',''));
     // 3だんめ：がい算の式
@@ -1315,6 +1345,55 @@
     box.appendChild(gr);
     g.appendChild(box);
     paintRange();
+  }
+
+  // がい算の ヒント
+  //  ① がい数に する まで：のこす 位の 下に「の」、四捨五入する 数字に 赤○
+  //  ② ×：がい数の 0 の 下に 〔 ）と「○つ」　÷：両方から 同じ 数だけ 0 を 斜線で けす
+  function paintGaiHint(){
+    if(mode!=='gai' || !P) return;
+    const gr=document.querySelector('.gaigrid'); if(!gr) return;
+    gr.querySelectorAll('.gd').forEach(e=>e.classList.remove('no','circ'));
+    gr.querySelectorAll('.gzero').forEach(e=>e.remove());
+    gr.querySelectorAll('.rslot').forEach(e=>e.classList.remove('strike'));
+    gr.classList.remove('zh');
+    const done = (rin[0]||'').length===P.rlen[0] && (rin[1]||'').length===P.rlen[1];
+    const md = P.sub==='top' && (P.op==='×' || P.op==='÷');
+    // 上から○けた：式が できあがったら、四捨五入の ヒントは おわり。ボタンも もとに もどす
+    if(md && done && !gDone && gHint){
+      gHint=false;
+      const hb=$('gaiHint'); if(hb){ hb.className='ghint'; hb.textContent='💡 ヒント'; }
+    }
+    gDone = done;
+    if(!gHint) return;
+    if(!(done && md)){
+      gr.querySelectorAll('.gnum').forEach(n=>{
+        const ds=n.querySelectorAll('.gd'), L=ds.length;
+        const k = (P.sub==='top') ? 0 : L - (P.keepName==='百の位' ? 3 : 4);   // のこす 位
+        if(k<0 || k+1>=L) return;
+        ds[k].classList.add('no'); ds[k+1].classList.add('circ');
+      });
+      return;
+    }
+    const tz = v=>{ let n=0; while(v>0 && v%10===0){ v/=10; n++; } return n; };
+    const boxes=gr.querySelectorAll('.abox');
+    if(P.op==='×'){
+      gr.classList.add('zh');
+      [0,1].forEach(b=>{
+        const n=tz(b===0?P.ra:P.rb), sl=boxes[b].querySelectorAll('.rslot'); if(!n) return;
+        const a=sl[sl.length-n], z=sl[sl.length-1];
+        const d=document.createElement('div'); d.className='gzero';
+        d.style.left=a.offsetLeft+'px'; d.style.width=(z.offsetLeft+z.offsetWidth-a.offsetLeft)+'px';
+        d.innerHTML='<svg viewBox="0 0 100 20" preserveAspectRatio="none"><path d="M3 2 Q4 17 50 17 Q96 17 97 2" fill="none" stroke="#C2410C" stroke-width="3" vector-effect="non-scaling-stroke" stroke-linecap="round"/></svg><span>'+n+'つ</span>';
+        boxes[b].appendChild(d);
+      });
+    }else{
+      const n=Math.min(tz(P.ra),tz(P.rb));
+      [0,1].forEach(b=>{
+        const sl=boxes[b].querySelectorAll('.rslot');
+        for(let i=sl.length-n;i<sl.length;i++) if(i>=0) sl[i].classList.add('strike');
+      });
+    }
   }
 
   function questionText(){
@@ -1753,6 +1832,15 @@
       b.onclick=judgeCards; b.disabled=(step!==3); c.appendChild(b);
     }
 
+    // がい算の ヒント ボタン（テンキーの 上）
+    if(mode==='gai'){
+      const hb=document.createElement('button'); hb.className='ghint'+(gHint?' on':''); hb.id='gaiHint';
+      hb.textContent = gHint ? '💡 ヒントを けす' : '💡 ヒント';
+      hb.onclick=()=>{ gHint=!gHint; if(gHint) window.hintOn=true;
+        hb.className='ghint'+(gHint?' on':''); hb.textContent = gHint ? '💡 ヒントを けす' : '💡 ヒント'; paintGaiHint(); };
+      c.appendChild(hb);
+    }
+
     // テンキーは いつも 出しておく（入力する ばめん 以外は おせない）
     if(mode!=='about' && mode!=='apply'){
     const pad=document.createElement('div'); pad.className='pad';
@@ -1833,7 +1921,7 @@
       return;
     }
     if(mode==='gai'){
-      P=makeGai(); step=3; rin=['','','']; rbox=0;
+      P=makeGai(); step=3; rin=['','','']; rbox=0; gHint=false; gDone=false;
       $('q').innerHTML=questionText();
       buildBoard(); panel();
       say('もとの数を がい数に して、見積もろう。','tip');
