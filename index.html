@@ -185,6 +185,7 @@
   .gaigrid.zh{margin-bottom:calc(var(--rslot) * 1.5)}
   /* がい算「文章題」 */
   .q .wn{color:var(--blue)}
+  .q.wu-on .wu{text-decoration:underline;text-decoration-color:var(--red);text-decoration-thickness:4px;text-underline-offset:7px}
   /* 文章題：問題の 文を 大きく、行の あいだを 広く */
   body.m-gword .q{font-size:clamp(16px,min(3.6vw,3vh),24px);line-height:1.7}
   body.m-gword .steps{margin-top:clamp(14px,3vh,26px)}
@@ -200,7 +201,7 @@
   .wchoice{display:flex;gap:clamp(6px,1.6vw,14px);justify-content:center;flex-wrap:wrap;margin-top:clamp(22px,5vh,46px)}
   .wchoice .wop{min-width:3em;font-size:clamp(16px,3.8vw,24px)}
   .wchoice .wclr{font-size:clamp(11px,2.6vw,14px);color:var(--pencil);border-color:var(--pencil);box-shadow:0 3px 0 var(--pencil)}
-  .weq{margin-top:clamp(14px,3vh,26px)}
+  .weq{margin-top:clamp(14px,3vh,26px);font-size:clamp(14px,min(3.2vw,2.6vh),19px);line-height:1.8}
   /* 1000－□－□ の ヒント：下線 → その下に 答え → 1000－□ を うすく（じゅんばんに）*/
   .gaigrid.kh{position:relative}
   .gkline{position:absolute;height:3px;border-radius:2px;background:var(--ink);pointer-events:none;
@@ -1474,13 +1475,13 @@
   // 文章題：× は「1つ分(3けた) × いくつ分(2けた)」、÷ は「全体 ÷ 人数など(2けた)」
   const WN = v => `<span class="wn">${v}</span>`;
   const WX = [
-    {t:(a,b)=>`1さつ ${WN(a)}円の 図かんが あります。この図かん ${WN(b)}さつの 代金は およそ いくらですか。`,
+    {t:(a,b)=>`<span class="wu">1さつ ${WN(a)}円</span>の 図かんが あります。この図かん ${WN(b)}さつの 代金は およそ いくらですか。`,
      what:'代金', unit:'円', eq:'1さつの ねだん × さつ数 ＝ 代金'},
-    {t:(a,b)=>`1こ ${WN(a)}円の ケーキを ${WN(b)}こ 注文します。代金は およそ いくらに なりますか。`,
+    {t:(a,b)=>`<span class="wu">1こ ${WN(a)}円</span>の ケーキを ${WN(b)}こ 注文します。代金は およそ いくらに なりますか。`,
      what:'代金', unit:'円', eq:'1この ねだん × こ数 ＝ 代金'},
-    {t:(a,b)=>`遠足で、1人 ${WN(a)}円の 入館料を はらいます。${WN(b)}人分では およそ いくらに なりますか。`,
+    {t:(a,b)=>`遠足で、<span class="wu">1人 ${WN(a)}円</span>の 入館料を はらいます。${WN(b)}人分では およそ いくらに なりますか。`,
      what:'入館料の 合計', unit:'円', eq:'1人分の 入館料 × 人数 ＝ 入館料の 合計'},
-    {t:(a,b)=>`ゆうたさんは、毎日 ${WN(a)}m 走ります。${WN(b)}日間では およそ 何m 走ることに なりますか。`,
+    {t:(a,b)=>`ゆうたさんは、<span class="wu">1日に ${WN(a)}m</span> 走ります。${WN(b)}日間では およそ 何m 走ることに なりますか。`,
      what:'走る 道のり', unit:'m', eq:'1日に 走る 道のり × 日数 ＝ 走る 道のり'}
   ];
   const WD = [
@@ -1681,7 +1682,8 @@
       box.appendChild(ch);
       // ヒント：ことばの式
       const eq=document.createElement('div'); eq.className='note calm weq';
-      eq.innerHTML='<b>ことばの式</b>　'+P.eq;
+      eq.innerHTML='<b>1つ分</b>（1人分・1こ分 など）が <b>わかっている</b>ときは、<b>かけ算</b>。<br>'
+                  +'<b>1つ分</b>が <b>わからない</b>ときは、<b>わり算</b>。';
       if(!gHint) eq.style.visibility='hidden';
       box.appendChild(eq);
       g.appendChild(box);
@@ -1712,7 +1714,8 @@
     gr.querySelectorAll('.gkline,.gknum').forEach(e=>e.remove());
     gr.querySelectorAll('.gkfade').forEach(e=>e.classList.remove('gkfade'));
     gr.classList.remove('kh','still');
-    if(P.sub==='word' && P.phase===0){        // 文章題の はじめ：ことばの式を 見せる
+    $('q').classList.toggle('wu-on', P.sub==='word' && P.phase===0 && gHint);   // 文章題：1つ分に 赤い 下線
+    if(P.sub==='word' && P.phase===0){        // 文章題の はじめ：かけ算か わり算かの ヒント
       const eq=document.querySelector('.weq'); if(eq) eq.style.visibility = gHint ? 'visible' : 'hidden';
       return;
     }
@@ -1785,7 +1788,8 @@
         + `<small>${P.what}は、何${P.unit}から 何${P.unit}の 間に あるでしょうか。数直線を つくって 考えましょう。</small>`;
       return `四捨五入して、<em>${P.pName}まで</em>のがい数にすると <em>${P.N}</em> になる整数のはんいを書きましょう。`;
     }
-    if(P.sub==='word') return `${P.story}<br>四捨五入して<em>上から１けた</em>のがい数にして、${P.what}を見積もりましょう。`;
+    if(P.sub==='word') return `${P.story}<br>四捨五入して<em>上から１けた</em>のがい数にして、`
+      + (P.op==='÷' ? `<span class="wu">${P.what}</span>` : P.what) + `を見積もりましょう。`;   // ヒントで 赤い 下線を 引く ところ
     if(P.sub==='place') return `四捨五入して<em>${P.keepName}まで</em>のがい数にして、答えを見積もりましょう。<small>（${P.roundName}で四捨五入します。）</small>`;
     return `四捨五入して<em>上から１けた</em>のがい数にして、${P.op==='×'?'積':'商'}を見積もりましょう。<small>（上から２けためで四捨五入します。）</small>`;
   }
@@ -2358,6 +2362,7 @@
     document.body.classList.toggle('m-gword', mode==='gai' && gsub==='word');   // 文章題だけ 問題の 文を 大きく
     window.mode = curKey();                            // テストの練習に いまの 小タブを つたえる
     window.hintOn = false;
+    $('q').classList.remove('wu-on');
     clearTimeout(autoTimer); autoTimer=null;
     document.querySelectorAll('.hanamaru').forEach(e=>e.remove());
     op=null; input=''; counted=false; locked=false; noShown=false; rin=['','']; rbox=0; sel=[];
